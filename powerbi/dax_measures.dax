@@ -1,0 +1,133 @@
+/*
+================================================================================
+DAX MEASURES SPECIFICATION: Sales Performance Dashboard
+Project: Retail & E-Commerce Business Intelligence
+Author: Senior Data Analyst / B.Tech Project
+Dataset: cleaned_sales_data.csv / FACT_SALES
+================================================================================
+*/
+
+--------------------------------------------------------------------------------
+-- 1. CORE EXECUTIVE KPI MEASURES
+--------------------------------------------------------------------------------
+
+// 1.1 Total Net Sales / Revenue
+[Total Sales] = 
+SUM(FACT_SALES[Sales_Amount])
+
+// 1.2 Total Quantity Sold (Units)
+[Total Units Sold] = 
+SUM(FACT_SALES[Quantity])
+
+// 1.3 Total Orders Placed
+[Total Orders] = 
+DISTINCTCOUNT(FACT_SALES[Order_ID])
+
+// 1.4 Total Active Customers
+[Total Customers] = 
+DISTINCTCOUNT(FACT_SALES[Customer_ID])
+
+// 1.5 Average Order Value (AOV)
+[Average Order Value] = 
+DIVIDE([Total Sales], [Total Orders], 0)
+
+// 1.6 Gross Revenue (Before Discounts)
+[Gross Sales] = 
+SUM(FACT_SALES[Gross_Amount])
+
+// 1.7 Total Discount Given
+[Total Discounts] = 
+SUM(FACT_SALES[Discount_Amount])
+
+// 1.8 Overall Average Discount Rate
+[Average Discount %] = 
+AVERAGE(FACT_SALES[Discount])
+
+
+--------------------------------------------------------------------------------
+-- 2. TIME-INTELLIGENCE & TREND MEASURES
+--------------------------------------------------------------------------------
+
+// 2.1 Prior Month Sales (MoM Analysis)
+[Sales Previous Month] = 
+CALCULATE(
+    [Total Sales],
+    PREVIOUSMONTH(DIM_DATE[Full_Date])
+)
+
+// 2.2 Month-over-Month (MoM) Sales Growth ($)
+[MoM Sales Growth $] = 
+[Total Sales] - [Sales Previous Month]
+
+// 2.3 Month-over-Month (MoM) Sales Growth (%)
+[MoM Sales Growth %] = 
+DIVIDE([MoM Sales Growth $], [Sales Previous Month], 0)
+
+// 2.4 Year-to-Date (YTD) Revenue
+[YTD Sales] = 
+TOTALYTD([Total Sales], DIM_DATE[Full_Date])
+
+// 2.5 Prior Year (Same Period Last Year) Sales (YoY)
+[Sales Same Period Last Year] = 
+CALCULATE(
+    [Total Sales],
+    SAMEPERIODLASTYEAR(DIM_DATE[Full_Date])
+)
+
+// 2.6 Year-over-Year (YoY) Sales Growth (%)
+[YoY Sales Growth %] = 
+DIVIDE([Total Sales] - [Sales Same Period Last Year], [Sales Same Period Last Year], 0)
+
+// 2.7 Cumulative Running Total Revenue
+[Cumulative Sales] = 
+CALCULATE(
+    [Total Sales],
+    FILTER(
+        ALLSELECTED(DIM_DATE[Full_Date]),
+        DIM_DATE[Full_Date] <= MAX(DIM_DATE[Full_Date])
+    )
+)
+
+
+--------------------------------------------------------------------------------
+-- 3. RANKING & CONTRIBUTION MEASURES
+--------------------------------------------------------------------------------
+
+// 3.1 Product Revenue Rank (Overall)
+[Product Rank] = 
+IF(
+    ISINSCOPE(DIM_PRODUCT[Product_Name]),
+    RANKX(ALL(DIM_PRODUCT[Product_Name]), [Total Sales], , DESC, DENSE)
+)
+
+// 3.2 Regional Revenue Contribution (%)
+[Regional % Share] = 
+DIVIDE(
+    [Total Sales],
+    CALCULATE([Total Sales], ALL(DIM_LOCATION[Region])),
+    0
+)
+
+// 3.3 Category Revenue Contribution (%)
+[Category % Share] = 
+DIVIDE(
+    [Total Sales],
+    CALCULATE([Total Sales], ALL(DIM_PRODUCT[Category])),
+    0
+)
+
+
+--------------------------------------------------------------------------------
+-- 4. DYNAMIC TITLES & FORMATTING HELPERS
+--------------------------------------------------------------------------------
+
+// 4.1 Dynamic Dashboard Subtitle based on Selected Filters
+[Dynamic Filter Subtitle] = 
+VAR SelectedRegion = IF(ISFILTERED(DIM_LOCATION[Region]), CONCATENATEX(VALUES(DIM_LOCATION[Region]), ", "), "All Regions")
+VAR SelectedCategory = IF(ISFILTERED(DIM_PRODUCT[Category]), CONCATENATEX(VALUES(DIM_PRODUCT[Category]), ", "), "All Categories")
+RETURN
+"Showing Data for: " & SelectedRegion & " | " & SelectedCategory
+
+// 4.2 KPI Card Color Indicator for Growth (Green/Red Hex)
+[MoM Color Indicator] = 
+IF([MoM Sales Growth %] >= 0, "#10B981", "#EF4444")
